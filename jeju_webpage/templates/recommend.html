@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>추천 결과</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center">추천 결과</h1>
+        <p class="text-center">사용자 정보:</p>
+        <ul class="list-group">
+            <li class="list-group-item">이름: {{ user_data.name }}</li>
+            <li class="list-group-item">나이: {{ user_data.age }}</li>
+            <li class="list-group-item">성별: {{ user_data.gender }}</li>
+            <li class="list-group-item">선택한 키워드: {{ user_data.keywords }}</li>
+        </ul>
+        <h2 class="mt-4">추천 여행지</h2>
+        <ul class="list-group">
+            {% for place in places %}
+            <li class="list-group-item">{{ place }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>

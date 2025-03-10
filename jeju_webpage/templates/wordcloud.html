@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Word Cloud</title>
+    <script src="https://cdn.jsdelivr.net/gh/timdream/wordcloud2.js@master/src/wordcloud2.js"></script>
+    <style>
+      #wordCloud {
+        width: 100%;
+        height: 500px;
+        border: 1px solid #ddd;
+        margin: 20px auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="text-center">원하는 #키워드 골라보기</h1>
+    <div id="wordCloud"></div>
+
+    <script>
+      const keywords = [
+        "#힐링", "#아이", "#재미", "#모험", "#동백",
+        "#카페", "#스누피", "#자연", "전시", "포토존"
+      ];
+
+      const options = {
+        list: keywords.map((word) => [word, Math.random() * 50 + 20]),
+        gridSize: 15,
+        weightFactor: (size) => size * 1.5, // 크기 조정
+        fontFamily: "Comic Sans MS, Arial, sans-serif",
+        fontWeight: "bold",
+        color: () => {
+          const colors = ["#FF5733", "#33FF57", "#3357FF", "#FFC300", "#DAF7A6"];
+          return colors[Math.floor(Math.random() * colors.length)];
+        },
+        rotateRatio: 0.5, // 일부 단어를 회전
+        shape: "circle", // 워드클라우드 모양
+        click: (item) => alert(`You clicked on: ${item[0]}`), // 클릭 이벤트
+      };
+
+      WordCloud(document.getElementById("wordCloud"), options);
+    </script>
+  </body>
+</html>
+
