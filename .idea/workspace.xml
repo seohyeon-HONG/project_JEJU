@@ -4,16 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="03ac4132-dfce-4403-9dff-4339015229aa" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/config/config.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/koclip_pipeline.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/koclip_pipeline" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/.gitkeep" beforeDir="false" />
-    </list>
+    <list default="true" id="03ac4132-dfce-4403-9dff-4339015229aa" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -72,7 +63,7 @@
       <option name="presentableId" value="Default" />
       <updated>1755500620755</updated>
       <workItem from="1755500621924" duration="4961000" />
-      <workItem from="1755585146128" duration="10169000" />
+      <workItem from="1755585146128" duration="10489000" />
     </task>
     <servers />
   </component>
