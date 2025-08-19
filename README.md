@@ -7,7 +7,6 @@
 Project_JEJU/
 ├─ README.md
 ├─ requirements.txt
-├─ .gitignore
 ├─ config/
 │  └─ config.yaml
 ├─ data/
