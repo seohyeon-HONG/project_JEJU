@@ -1,9 +1,0 @@
-data/
-outputs/models/
-*.pt
-*.pkl
-*.zip
-.env
-.ipynb_checkpoints/
-__pycache__/
-.DS_Store
