@@ -1,4 +1,3 @@
-# 타겟 점수 정규화 및 데이터 필터링
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import PowerTransformer, MinMaxScaler
@@ -124,3 +123,4 @@ class TargetScoreNormalizer:
         self._print_normalization_results(df)
 
         return df
+
