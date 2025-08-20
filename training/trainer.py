@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.model_selection import KFold
 from torch.utils.data import DataLoader
 
@@ -25,9 +24,7 @@ def train_and_evaluate(
         lr=Config.LEARNING_RATE,
         weight_decay=Config.WEIGHT_DECAY
 ):
-    """ 
-    모델 학습 및 평가 함수 
-    """
+    """모델 학습 및 평가 함수"""
     print(f"모델 학습 시작")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"사용 장치: {device}")
@@ -51,6 +48,7 @@ def train_and_evaluate(
 
         print(f"학습 샘플: {len(train_df)}, 테스트 샘플: {len(test_df)}")
 
+        # 데이터셋 및 데이터로더 생성
         from data.dataset import EmotionPersonaDataset
 
         train_dataset = EmotionPersonaDataset(
@@ -60,12 +58,8 @@ def train_and_evaluate(
             test_df, traveler_features, attraction_features, traveler_pc_scores
         )
 
-        train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=batch_size, shuffle=True, num_workers=2
-        )
-        test_loader = torch.utils.data.DataLoader(
-            test_dataset, batch_size=batch_size, shuffle=False, num_workers=2
-        )
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
 
         from models.recommender import EmotionPersonaRecommender
 
@@ -91,6 +85,7 @@ def train_and_evaluate(
             model.attraction_projector.load_state_dict(pretrained_projector.state_dict())
             print("사전 훈련된 Attraction Projector 가중치 로드 완료")
 
+        # 손실 함수
         from models.losses import RecommendationLoss
 
         criterion = RecommendationLoss(
@@ -100,186 +95,107 @@ def train_and_evaluate(
             filter_reg_weight=Config.FILTER_REG_WEIGHT
         )
 
+        # 옵티마이저
         optimizer = torch.optim.AdamW(
             model.parameters(),
-            lr=lr * 0.1,  # 학습률 감소
-            weight_decay=weight_decay * 0.1,  # 가중치 감쇠 감소
+            lr=lr * 0.1,
+            weight_decay=weight_decay * 0.1,
             betas=(0.9, 0.999),
             eps=1e-8
         )
 
+        # 학습률 스케줄러
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
-            max_lr=lr * 0.1,  # 최대 학습률 감소
+            max_lr=lr * 0.1,
             steps_per_epoch=len(train_loader),
             epochs=n_epochs,
             pct_start=0.3,
-            div_factor=10.0,  # 더 작은 초기 학습률 감소율
-            final_div_factor=100.0  # 더 작은 최종 학습률 감소율
+            div_factor=10.0,
+            final_div_factor=100.0
         )
 
+        # 조기 종료 설정
         best_ndcg = 0
         best_model_state = None
         patience = 5
         patience_counter = 0
 
-        loss_history = {
-            'total': [],
-            'mse': [],
-            'bpr': [],
-            'diff_reg': [],
-            'filter_reg': []
-        }
-
+        # 에포크별 학습
         for epoch in range(n_epochs):
             model.train()
             train_loss = 0
-            mse_losses = []
-            bpr_losses = []
-            diff_reg_losses = []
-            filter_reg_losses = []
-            filter_activations = []
+            valid_batches = 0
 
-            for batch_idx, batch in enumerate(train_loader):
-                try:
-                    persona = batch['persona'].to(device)
-                    attraction = batch['attraction'].to(device)
-                    pc_scores = batch['pc_scores'].to(device)
-                    scores = batch['score'].to(device)
+            for batch in train_loader:
+                persona = batch['persona'].to(device)
+                attraction = batch['attraction'].to(device)
+                pc_scores = batch['pc_scores'].to(device)
+                scores = batch['score'].to(device)
 
-                    predictions, pc_weights, filter_activation, _ = model(persona, attraction, pc_scores)
+                predictions, pc_weights, filter_activation, _ = model(persona, attraction, pc_scores)
 
-                    if torch.isnan(predictions).any() or torch.isnan(pc_weights).any():
-                        print(f"배치 {batch_idx}에서 NaN 발견 - 건너뛰기")
-                        continue
-
-                    loss, loss_components = criterion(predictions, scores, filter_activation, pc_weights)
-
-                    if torch.isnan(loss).any():
-                        print(f"배치 {batch_idx}에서 NaN 손실 발견 - 건너뛰기")
-                        continue
-
-                    optimizer.zero_grad()
-                    loss.backward()
-
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)  # 임계값 0.5 -> 0.1로 낮춤
-
-                    optimizer.step()
-                    scheduler.step()
-
-                    train_loss += loss.item()
-                    mse_losses.append(loss_components['mse_loss'])
-                    bpr_losses.append(loss_components['bpr_loss'])
-                    diff_reg_losses.append(loss_components['diff_reg_loss'])
-                    filter_reg_losses.append(loss_components['filter_reg'])
-                    filter_activations.append(filter_activation)
-
-                except Exception as e:
-                    print(f"배치 {batch_idx} 처리 중 오류 발생: {e}")
+                if torch.isnan(predictions).any() or torch.isnan(pc_weights).any():
                     continue
 
-            if not mse_losses:
-                print("경고: 이번 에포크에서 유효한 배치가 없습니다.")
-                continue
-                    
-            train_loss /= max(1, len(mse_losses))  # 0으로 나누기 방지
-            avg_mse = np.mean(mse_losses) if mse_losses else 0
-            avg_bpr = np.mean(bpr_losses) if bpr_losses else 0
-            avg_diff_reg = np.mean(diff_reg_losses) if diff_reg_losses else 0
-            avg_filter_reg = np.mean(filter_reg_losses) if filter_reg_losses else 0
-            avg_filter_activation = np.mean(filter_activations) if filter_activations else 0
+                loss, loss_components = criterion(predictions, scores, filter_activation, pc_weights)
 
-            loss_history['total'].append(train_loss)
-            loss_history['mse'].append(avg_mse)
-            loss_history['bpr'].append(avg_bpr)
-            loss_history['diff_reg'].append(avg_diff_reg)
-            loss_history['filter_reg'].append(avg_filter_reg)
+                if torch.isnan(loss).any():
+                    continue
+
+                optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
+                optimizer.step()
+                scheduler.step()
+
+                train_loss += loss.item()
+                valid_batches += 1
+
+            if valid_batches > 0:
+                train_loss /= valid_batches
 
             if (epoch + 1) % 5 == 0 or epoch == n_epochs - 1:
-                try:
-                    from evaluation.evaluator import evaluate_model
-                    metrics, _, _, _, _, epoch_pc_weights = evaluate_model(model, test_loader, device)
-                    ndcg5 = metrics.get('ndcg@5', 0)
+                from evaluation.evaluator import evaluate_model
+                metrics, _, _, _, _, epoch_pc_weights = evaluate_model(model, test_loader, device)
+                ndcg5 = metrics.get('ndcg@5', 0)
 
-                    print(f"Epoch {epoch + 1}/{n_epochs}, Loss: {train_loss:.4f}, "
-                          f"MSE: {avg_mse:.4f}, BPR: {avg_bpr:.4f}, "
-                          f"필터 활성화: {avg_filter_activation:.6f}, NDCG@5: {ndcg5:.4f}")
+                print(f"Epoch {epoch + 1}/{n_epochs}, Loss: {train_loss:.4f}, NDCG@5: {ndcg5:.4f}")
 
-                    if epoch_pc_weights is not None:
-                        print("PC 차원 중요도 가중치:")
-                        for i, weight in enumerate(epoch_pc_weights):
-                            pc_name = f"PC{i + 1}"
-                            meaning = pc_meanings.get(pc_name, "")
-                            weight_val = weight.item() if not torch.isnan(weight).any() else "NaN"
-                            print(f"  {pc_name} ({meaning}): {weight_val}")
+                # 최고 성능 모델 저장
+                if ndcg5 > best_ndcg:
+                    best_ndcg = ndcg5
+                    best_model_state = copy.deepcopy(model.state_dict())
+                    best_pc_weights = epoch_pc_weights
+                    patience_counter = 0
+                else:
+                    patience_counter += 1
 
-                    if ndcg5 > best_ndcg:
-                        best_ndcg = ndcg5
-                        best_model_state = copy.deepcopy(model.state_dict())
-                        best_pc_weights = epoch_pc_weights
-                        patience_counter = 0
-                    else:
-                        patience_counter += 1
+                # 조기 종료
+                if patience_counter >= patience:
+                    print(f"조기 종료: {patience} 에포크 동안 성능 향상 없음")
+                    break
 
-                    if patience_counter >= patience:
-                        print(f"조기 종료: {patience} 에포크 동안 성능 향상 없음")
-                        break
-
-                except Exception as e:
-                    print(f"평가 중 오류 발생: {e}")
-                    continue
-
+        # 최고 성능 모델로 복원
         if best_model_state is not None:
             model.load_state_dict(best_model_state)
 
-        try:
-            from evaluation.evaluator import evaluate_model
-            metrics, user_metrics, user_predictions, user_ground_truth, user_attraction_ids, final_pc_weights = evaluate_model(
-                model, test_loader, device
-            )
+        # 최종 평가
+        from evaluation.evaluator import evaluate_model
+        metrics, user_metrics, user_predictions, user_ground_truth, user_attraction_ids, final_pc_weights = evaluate_model(
+            model, test_loader, device
+        )
 
-            print(f"\n폴드 {fold + 1} 최종 결과:")
-            for metric, value in metrics.items():
-                print(f"{metric}: {value:.4f}")
+        print(f"\n폴드 {fold + 1} 최종 결과:")
+        for metric, value in metrics.items():
+            print(f"{metric}: {value:.4f}")
 
-            print("\nPC 차원별 최종 중요도:")
-            for i, weight in enumerate(final_pc_weights):
-                pc_name = f"PC{i + 1}"
-                meaning = pc_meanings.get(pc_name, "")
-                weight_val = weight.item() if not torch.isnan(weight).any() else "NaN"
-                print(f"  {pc_name} ({meaning}): {weight_val}")
+        # 결과 저장
+        fold_metrics.append(metrics)
+        fold_pc_weights.append(final_pc_weights)
+        best_models.append((model, user_predictions, user_ground_truth, user_attraction_ids))
 
-            if model.importance_count > 0:
-                accumulated_importance = model.pc_dim_importance / model.importance_count
-                print("\n학습 과정에서의 PC 차원 누적 중요도:")
-                for i, imp in enumerate(accumulated_importance):
-                    pc_name = f"PC{i + 1}"
-                    meaning = pc_meanings.get(pc_name, "")
-                    imp_val = imp.item() if not torch.isnan(imp).any() else "NaN"
-                    print(f"  {pc_name} ({meaning}): {imp_val}")
-
-            fold_metrics.append(metrics)
-            fold_pc_weights.append(final_pc_weights)
-            best_models.append((model, user_predictions, user_ground_truth, user_attraction_ids))
-
-        except Exception as e:
-            print(f"최종 평가 중 오류 발생: {e}")
-            continue
-
-        plt.figure(figsize=(10, 6))
-        plt.plot(loss_history['total'], label='Total Loss')
-        plt.plot(loss_history['mse'], label='MSE Loss')
-        plt.plot(loss_history['bpr'], label='BPR Loss')
-        plt.plot(loss_history['diff_reg'], label='Diff Reg')
-        plt.plot(loss_history['filter_reg'], label='Filter Reg')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title(f'Fold {fold + 1} Training Loss')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        plt.savefig(f"fold_{fold + 1}_loss.png")
-        plt.close()
-
+    # 전체 폴드의 평균 성능 계산
     avg_metrics = {}
     for metric in [f'ndcg@{k}' for k in Config.TOP_K_VALUES] + \
                   [f'precision@{k}' for k in Config.TOP_K_VALUES] + \
@@ -287,12 +203,13 @@ def train_and_evaluate(
         values = [fold[metric] for fold in fold_metrics if metric in fold]
         avg_metrics[metric] = np.mean(values) if values else 0
 
+    # 평균 PC 차원 가중치 계산
     avg_pc_weights = torch.zeros(Config.NUM_PC_DIMS, device=device)
     for weights in fold_pc_weights:
         avg_pc_weights += weights
     avg_pc_weights /= len(fold_pc_weights)
 
-
+    # 최종 출력
     print("\n===== 전체 성능 =====")
     for metric, value in avg_metrics.items():
         print(f"{metric}: {value:.4f}")
@@ -303,10 +220,10 @@ def train_and_evaluate(
         meaning = pc_meanings.get(pc_name, "")
         print(f"  {pc_name} ({meaning}): {weight.item():.4f}")
 
+    # 최고 성능 모델 선택
     best_model_idx = np.argmax([
         fold_metrics[fold_idx].get('ndcg@5', 0) for fold_idx in range(len(fold_metrics))
     ])
     best_model, _, _, _ = best_models[best_model_idx]
-
 
     return best_model, avg_metrics, fold_metrics, fold_pc_weights, best_models
