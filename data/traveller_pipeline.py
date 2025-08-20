@@ -116,35 +116,3 @@ class PersonaProcessor:
             meaning = self.pc_meanings.get(pc_col, '')
             variance = explained_variance_ratio[i]
             print(f"{pc_col}: {meaning} (설명력: {variance:.3f})")
-
-    def save_processor(self, save_path: str):
-        
-        if not self.is_fitted:
-            raise ValueError("PCA가 아직 학습되지 않았습니다.")
-
-        processor_data = {
-            'scaler': self.scaler,
-            'pca': self.pca,
-            'n_components': self.n_components,
-            'pc_meanings': self.pc_meanings,
-            'explained_variance_ratio': self.pca.explained_variance_ratio_
-        }
-
-        with open(save_path, 'wb') as f:
-            pickle.dump(processor_data, f)
-
-        print(f"PCA 프로세서가 {save_path}에 저장되었습니다.")
-
-    def load_processor(self, load_path: str):
-        
-        with open(load_path, 'rb') as f:
-            processor_data = pickle.load(f)
-
-        self.scaler = processor_data['scaler']
-        self.pca = processor_data['pca']
-        self.n_components = processor_data['n_components']
-        self.pc_meanings = processor_data['pc_meanings']
-        self.is_fitted = True
-
-        print(f"PCA 프로세서가 {load_path}에서 로드되었습니다.")
-        print(f"설명 비율: {processor_data['explained_variance_ratio']}")
