@@ -178,35 +178,3 @@ class PersonaProcessor:
 
         print(f"PCA 프로세서가 {load_path}에서 로드되었습니다.")
         print(f"설명 비율: {processor_data['explained_variance_ratio']}")
-
-
-def main():
-    """사용 예시"""
-    # 설정
-    CONFIG = {
-        'persona_data_path': "/path/to/persona_features_final_with_id.csv",
-        'output_path': "/path/to/output/",
-        'n_components': 7,
-        'random_state': 42
-    }
-
-    # 데이터 로드
-    persona_df = pd.read_csv(CONFIG['persona_data_path'])
-
-    # 프로세서 초기화 및 변환
-    processor = PersonaProcessor(
-        n_components=CONFIG['n_components'],
-        random_state=CONFIG['random_state']
-    )
-
-    # PCA 변환
-    persona_df_pca, traveler_pc_scores = processor.fit_transform(persona_df)
-
-    # 프로세서 저장
-    processor.save_processor(f"{CONFIG['output_path']}/persona_processor.pkl")
-
-    print(f"처리 완료: {len(traveler_pc_scores)}명의 사용자 PC 점수 생성")
-
-
-if __name__ == "__main__":
-    main()
