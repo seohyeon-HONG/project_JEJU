@@ -6,8 +6,8 @@ from typing import Optional, Tuple, Dict
 
 class TargetScoreNormalizer:
     """
-    타겟 점수 정규화를 담당하는 클래스
-    전역 정규화와 페르소나별 적응적 정규화를 지원
+    타겟 점수 정규화
+    전역 정규화 / 페르소나별 적응적 정규화
     """
 
     def __init__(self,
@@ -15,34 +15,18 @@ class TargetScoreNormalizer:
                  wr_weight: float = 0.4,
                  use_persona_adaptation: bool = True,
                  top_pc_dims: int = 3):
-        """
-        Args:
-            w_weight: W 점수 가중치
-            wr_weight: WR 점수 가중치
-            use_persona_adaptation: 페르소나별 적응적 정규화 사용 여부
-            top_pc_dims: 적응적 정규화에 사용할 주요 PC 차원 수
-        """
+
         self.w_weight = w_weight
         self.wr_weight = wr_weight
         self.use_persona_adaptation = use_persona_adaptation
         self.top_pc_dims = top_pc_dims
 
-        # 변환기들
         self.power_transformer = PowerTransformer(method='yeo-johnson', standardize=True)
         self.minmax_scaler = MinMaxScaler()
 
         self.is_fitted = False
 
     def compute_target_score(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        W와 WR의 가중 평균으로 TARGET_SCORE 계산
-
-        Args:
-            df: W, WR 컬럼이 포함된 데이터프레임
-
-        Returns:
-            TARGET_SCORE 컬럼이 추가된 데이터프레임
-        """
         df = df.copy()
         df['TARGET_SCORE'] = self.w_weight * df['W'] + self.wr_weight * df['WR']
         return df
@@ -238,41 +222,3 @@ class DataFilter:
 
         print(f"최소 방문 수 ({min_visits}회) 필터링: {len(df)} → {len(filtered_df)} 행")
         return filtered_df
-
-
-def main():
-    """사용 예시"""
-    # 설정
-    CONFIG = {
-        'travel_logs_path': "/path/to/cross_attention_input.csv",
-        'persona_pca_path': "/path/to/persona_pca.csv",
-        'output_path': "/path/to/output/",
-        'w_weight': 0.6,
-        'wr_weight': 0.4,
-        'use_persona_adaptation': True
-    }
-
-    # 데이터 로드
-    travel_logs = pd.read_csv(CONFIG['travel_logs_path'])
-    persona_df_pca = pd.read_csv(CONFIG['persona_pca_path'])
-
-    # 타겟 점수 정규화
-    normalizer = TargetScoreNormalizer(
-        w_weight=CONFIG['w_weight'],
-        wr_weight=CONFIG['wr_weight'],
-        use_persona_adaptation=CONFIG['use_persona_adaptation']
-    )
-
-    # 정규화 수행
-    normalized_df = normalizer.normalize_target_scores(
-        travel_logs,
-        persona_df_pca
-    )
-
-    print(f"정규화 완료: TARGET_SCORE_FINAL 컬럼 생성")
-    print(
-        f"최종 점수 범위: {normalized_df['TARGET_SCORE_FINAL'].min():.3f} ~ {normalized_df['TARGET_SCORE_FINAL'].max():.3f}")
-
-
-if __name__ == "__main__":
-    main()
