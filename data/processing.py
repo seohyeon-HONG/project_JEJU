@@ -60,20 +60,16 @@ class TargetScoreNormalizer:
         """
         df = df.copy()
 
-        # 주요 PC 차원 선택
         pc_columns = [f'PC{i+1}' for i in range(self.top_pc_dims)]
 
-        # 각 사용자의 주요 PC 차원 값 추출
         user_pc_values = {}
         for _, row in persona_df_pca.iterrows():
             user_id = row['TRAVELER_ID']
             pc_values = row[pc_columns].values
             user_pc_values[user_id] = pc_values
 
-        # 감성 강도 계산 (PC 값의 절대값 평균)
         persona_intensities = {}
         for user_id, pc_values in user_pc_values.items():
-            # 감성 강도는 0.5~2.0 범위로 제한
             intensity = 1.0 + np.clip(np.mean(np.abs(pc_values)), 0.0, 1.0)
             persona_intensities[user_id] = intensity
 
@@ -123,4 +119,5 @@ class TargetScoreNormalizer:
         self._print_normalization_results(df)
 
         return df
+
 
