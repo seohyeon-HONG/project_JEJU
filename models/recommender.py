@@ -3,6 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
 
+# 다른 모듈에서 import (실제 구현 시)
+# from .encoders import EmotionEncoder, AttractionEmotionProjector, PersonaExpansionLayer
+# from .attention_modules import BidirectionalCrossAttention, AttractionToEmotionAttention  
+# from .filters import EnhancedPCDimensionFilter
+# from .experts import ExpertLayer
+
 
 class EmotionInteractionModule(nn.Module):
     """
@@ -71,7 +77,6 @@ class EmotionPersonaRecommender(nn.Module):
         assert emotion_dim % num_heads == 0, f"Emotion dimension ({emotion_dim}) must be divisible by num_heads ({num_heads})"
         assert hidden_dim % num_heads == 0, f"Hidden dimension ({hidden_dim}) must be divisible by num_heads ({num_heads})"
 
-        # 메인 모듈들
         self.emotion_interaction = EmotionInteractionModule(
             emotion_dim=emotion_dim,
             num_heads=num_heads
@@ -85,7 +90,6 @@ class EmotionPersonaRecommender(nn.Module):
             nn.Linear(emotion_dim // 2, 1)
         )
 
-        # PC 차원 중요도 추적용
         self.register_buffer('pc_dim_importance', torch.zeros(pc_dim))
         self.importance_count = 0
 
@@ -93,29 +97,23 @@ class EmotionPersonaRecommender(nn.Module):
                 add_noise: bool = False) -> Tuple[torch.Tensor, torch.Tensor, float, torch.Tensor]:
         batch_size = persona.size(0)
 
-        # 훈련 중 약간의 노이즈 추가
         if self.training and add_noise:
             persona = persona + torch.randn_like(persona) * 0.01
             attraction = attraction + torch.randn_like(attraction) * 0.01
 
-        # 감성 차원 간 상호작용
         persona_interacted, weighted_pc_scores = self.emotion_interaction(persona, pc_scores)
 
-        # 추천 점수 계산
         if self.use_emotion_matching:
-            # 코사인 유사도 기반 매칭
             similarity = F.cosine_similarity(persona, attraction, dim=1)
             scaled_similarity = (similarity + 1) / 2
             final_output = scaled_similarity
         else:
             final_output = self.output_layer(persona_interacted).squeeze(-1)
 
-        # PC 차원 중요도 누적
         if self.training:
             self.pc_dim_importance += weighted_pc_scores.mean(dim=0).detach()
             self.importance_count += 1
 
-        # 필터 활성화 정도 측정
         filter_activation = torch.mean(torch.abs(persona_interacted - persona)).item()
 
         return final_output, weighted_pc_scores, filter_activation, None
