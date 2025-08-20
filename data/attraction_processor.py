@@ -38,7 +38,7 @@ class KoCLIPEmbeddingProcessor:
             return []
 
         texts = re.findall(r'\'([^\']+)\'', match.group(1))
-        return list(set(texts))  # 중복 제거
+        return list(set(texts))  
 
     def extract_paths(self, path_str: str) -> List[str]:
         if not isinstance(path_str, str):
@@ -49,7 +49,7 @@ class KoCLIPEmbeddingProcessor:
             return []
 
         paths = re.findall(r'\'([^\']+)\'', match.group(1))
-        return list(set(paths))  # 중복 제거
+        return list(set(paths))  
 
     def get_koclip_embeddings(self, texts: List[str], image_paths: List[str],
                               max_chars: int = 500) -> Dict[str, List[np.ndarray]]:
@@ -182,18 +182,3 @@ class KoCLIPEmbeddingProcessor:
                 continue
 
         return results
-
-    def save_embeddings(self, embeddings: Dict[int, Dict[str, Any]],
-                        output_path: str) -> None:
-        output_dir = os.path.dirname(output_path)
-        os.makedirs(output_dir, exist_ok=True)
-
-        with open(output_path, 'wb') as f:
-            pickle.dump(embeddings, f)
-
-        print(f"임베딩이 '{output_path}'에 저장되었습니다. (총 {len(embeddings)}개 항목)")
-
-    def load_embeddings(self, file_path: str) -> Dict[int, Dict[str, Any]]:
-        with open(file_path, 'rb') as f:
-            embeddings = pickle.load(f)
-        return embeddings
