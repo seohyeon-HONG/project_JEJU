@@ -1,3 +1,4 @@
+# 타겟 점수 정규화 및 데이터 필터링
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import PowerTransformer, MinMaxScaler
@@ -53,49 +54,10 @@ class TargetScoreNormalizer:
 
         return yeo_transformed.flatten(), minmax_transformed.flatten()
 
-    def _compute_persona_intensities(self, persona_df_pca: pd.DataFrame) -> Dict[str, float]:
-        """
-        페르소나별 감성 강도 계산
-
-        Args:
-            persona_df_pca: PCA 변환된 페르소나 데이터프레임
-
-        Returns:
-            사용자 ID별 감성 강도 딕셔너리
-        """
-        pc_columns = [f'PC{i + 1}' for i in range(self.top_pc_dims)]
-
-        persona_intensities = {}
-        for _, row in persona_df_pca.iterrows():
-            user_id = row['TRAVELER_ID']
-            pc_values = row[pc_columns].values
-
-            # 감성 강도는 0.5~2.0 범위로 제한
-            intensity = 1.0 + np.clip(np.mean(np.abs(pc_values)), 0.0, 1.0)
-            persona_intensities[user_id] = intensity
-
-        return persona_intensities
-
-    def _s_curve_transform(self, score: float, intensity: float) -> float:
-        """
-        S-커브 변환 함수
-
-        Args:
-            score: 변환할 점수 (0-1 범위)
-            intensity: 감성 강도
-
-        Returns:
-            변환된 점수
-        """
-        # 0.5를 중심으로 거리 계산
-        distance = score - 0.5
-
-        # S-커브 적용 (시그모이드 기반)
-        steepness = intensity * 5.0  # 기울기 조절 파라미터
-        transformed = 0.5 + distance * (2.0 / (1.0 + np.exp(-steepness * distance)))
-
-        # 범위 제한
-        return np.clip(transformed, 0.0, 1.0)
+    def _print_normalization_results(self, df: pd.DataFrame):
+        """정규화 결과 출력"""
+        print("\n정규화 전후 점수 분포:")
+        print(df[['TARGET_SCORE', 'TARGET_SCORE_YEO', 'TARGET_SCORE_FINAL']].describe())
 
     def persona_adaptive_normalize(self,
                                    df: pd.DataFrame,
@@ -112,8 +74,32 @@ class TargetScoreNormalizer:
         """
         df = df.copy()
 
-        # 페르소나별 감성 강도 계산
-        persona_intensities = self._compute_persona_intensities(persona_df_pca)
+        # 주요 PC 차원 선택
+        pc_columns = [f'PC{i+1}' for i in range(self.top_pc_dims)]
+
+        # 각 사용자의 주요 PC 차원 값 추출
+        user_pc_values = {}
+        for _, row in persona_df_pca.iterrows():
+            user_id = row['TRAVELER_ID']
+            pc_values = row[pc_columns].values
+            user_pc_values[user_id] = pc_values
+
+        # 감성 강도 계산 (PC 값의 절대값 평균)
+        persona_intensities = {}
+        for user_id, pc_values in user_pc_values.items():
+            # 감성 강도는 0.5~2.0 범위로 제한
+            intensity = 1.0 + np.clip(np.mean(np.abs(pc_values)), 0.0, 1.0)
+            persona_intensities[user_id] = intensity
+
+        # S-커브 변환 함수 정의
+        def s_curve_transform(score, intensity):
+            # 0.5를 중심으로 거리 계산
+            distance = score - 0.5
+            # S-커브 적용 (시그모이드 기반)
+            steepness = intensity * 5.0
+            transformed = 0.5 + distance * (2.0 / (1.0 + np.exp(-steepness * distance)))
+            # 범위 제한
+            return np.clip(transformed, 0.0, 1.0)
 
         # 조정된 점수 계산
         adjusted_scores = []
@@ -123,7 +109,7 @@ class TargetScoreNormalizer:
             intensity = persona_intensities.get(user_id, 1.0)
 
             # S-커브 변환 적용
-            adjusted = self._s_curve_transform(global_score, intensity)
+            adjusted = s_curve_transform(global_score, intensity)
             adjusted_scores.append(adjusted)
 
         df['TARGET_SCORE_ADJUSTED'] = adjusted_scores
@@ -166,59 +152,3 @@ class TargetScoreNormalizer:
         self._print_normalization_results(df)
 
         return df
-
-
-class DataFilter:
-    """
-    데이터 필터링을 담당하는 클래스
-    """
-
-    @staticmethod
-    def filter_valid_logs(df: pd.DataFrame,
-                          traveler_features: Dict,
-                          attraction_features: Dict) -> pd.DataFrame:
-        """
-        유효한 데이터만 필터링 (페르소나와 관광지 특성이 모두 있는 경우)
-
-        Args:
-            df: 필터링할 데이터프레임
-            traveler_features: 사용자 특성 딕셔너리
-            attraction_features: 관광지 특성 딕셔너리
-
-        Returns:
-            필터링된 데이터프레임
-        """
-        print("유효한 데이터 필터링 중...")
-
-        filtered_logs = []
-        for _, row in df.iterrows():
-            t_id = row['TRAVELER_ID']
-            a_id = int(row['UNIQUE_VISIT_ID'])
-
-            if t_id in traveler_features and a_id in attraction_features:
-                filtered_logs.append(row)
-
-        filtered_df = pd.DataFrame(filtered_logs)
-
-        print(f"필터링 완료: {len(df)} → {len(filtered_df)} 행")
-        return filtered_df
-
-    @staticmethod
-    def filter_min_visits(df: pd.DataFrame, min_visits: int = 5) -> pd.DataFrame:
-        """
-        최소 방문 수 이상의 사용자만 필터링
-
-        Args:
-            df: 필터링할 데이터프레임
-            min_visits: 최소 방문 수
-
-        Returns:
-            필터링된 데이터프레임
-        """
-        user_visit_counts = df['TRAVELER_ID'].value_counts()
-        valid_users = user_visit_counts[user_visit_counts >= min_visits].index
-
-        filtered_df = df[df['TRAVELER_ID'].isin(valid_users)]
-
-        print(f"최소 방문 수 ({min_visits}회) 필터링: {len(df)} → {len(filtered_df)} 행")
-        return filtered_df
