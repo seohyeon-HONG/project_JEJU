@@ -12,7 +12,6 @@ class BidirectionalCrossAttention(nn.Module):
     def __init__(self, embed_dim: int = 128, num_heads: int = 4, dropout_rate: float = 0.25):
         super(BidirectionalCrossAttention, self).__init__()
 
-        # 헤드 수로 나누어 떨어지는지 확인
         assert embed_dim % num_heads == 0, f"Embedding dimension ({embed_dim}) must be divisible by num_heads ({num_heads})"
 
         # 페르소나 -> 관광지 어텐션
@@ -120,5 +119,6 @@ class AttractionToEmotionAttention(nn.Module):
         emotion_scores = self.emotion_projection(attn_out)
 
         gated_scores = emotion_scores * torch.sigmoid(self.pc_gates)
+
 
         return gated_scores
