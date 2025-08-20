@@ -52,11 +52,9 @@ class PersonaExpansionLayer(nn.Module):
     """
 
     def __init__(self, input_dim: int, expansion_factor: int = 1, dropout_rate: float = 0.25):
-        """
-        입력 차원을 확장하지 않고 유지하도록 수정 (expansion_factor=1)
-        """
+        
         super(PersonaExpansionLayer, self).__init__()
-        self.expanded_dim = input_dim  # 차원 확장 없이 동일하게 유지
+        self.expanded_dim = input_dim  
 
         self.expansion = nn.Sequential(
             nn.Linear(input_dim, self.expanded_dim),
@@ -72,4 +70,5 @@ class PersonaExpansionLayer(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         residual = self.residual_proj(x)
         expanded = self.expansion(x)
+
         return expanded + residual
