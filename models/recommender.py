@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
 
-# 다른 모듈에서 import (실제 구현 시)
 # from .encoders import EmotionEncoder, AttractionEmotionProjector, PersonaExpansionLayer
 # from .attention_modules import BidirectionalCrossAttention, AttractionToEmotionAttention  
 # from .filters import EnhancedPCDimensionFilter
@@ -117,3 +116,4 @@ class EmotionPersonaRecommender(nn.Module):
         filter_activation = torch.mean(torch.abs(persona_interacted - persona)).item()
 
         return final_output, weighted_pc_scores, filter_activation, None
+
