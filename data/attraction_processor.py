@@ -197,32 +197,3 @@ class KoCLIPEmbeddingProcessor:
         with open(file_path, 'rb') as f:
             embeddings = pickle.load(f)
         return embeddings
-
-
-
-def main():
-    # 설정
-    CONFIG = {
-        'multi_embedding_df_path': "/content/drive/MyDrive/Project_JEJU/dataset/embedding_data.csv",
-        'output_path': "/content/drive/MyDrive/Project_JEJU/modeling/embeddings_pkl/enhanced_koclip_embeddings.pkl",
-        'model_name': "koclip/koclip-base-pt",
-        'max_chars': 500
-    }
-
-    # 프로세서 초기화
-    processor = KoCLIPEmbeddingProcessor(model_name=CONFIG['model_name'])
-
-    # 데이터 로드
-    print("데이터 로드 중...")
-    df = pd.read_csv(CONFIG['multi_embedding_df_path'])
-    print(f"데이터 로드 완료: {len(df)}개 행")
-
-    # 임베딩 생성
-    embeddings = processor.process_dataset(df)
-
-    # 결과 저장
-    processor.save_embeddings(embeddings, CONFIG['output_path'])
-
-
-if __name__ == "__main__":
-    main()
