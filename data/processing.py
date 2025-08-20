@@ -35,12 +35,6 @@ class TargetScoreNormalizer:
     def global_normalize(self, scores: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
         전역 정규화: Yeo-Johnson 변환 + MinMax 스케일링
-
-        Args:
-            scores: 정규화할 점수 배열
-
-        Returns:
-            Yeo-Johnson 변환 결과, MinMax 스케일링 결과
         """
         scores_reshaped = scores.reshape(-1, 1)
 
@@ -64,13 +58,6 @@ class TargetScoreNormalizer:
                                    persona_df_pca: pd.DataFrame) -> pd.DataFrame:
         """
         페르소나별 적응적 정규화 수행
-
-        Args:
-            df: 정규화할 데이터프레임 (TARGET_SCORE_GLOBAL 컬럼 필요)
-            persona_df_pca: PCA 변환된 페르소나 데이터프레임
-
-        Returns:
-            적응적 정규화가 적용된 데이터프레임
         """
         df = df.copy()
 
@@ -93,22 +80,17 @@ class TargetScoreNormalizer:
 
         # S-커브 변환 함수 정의
         def s_curve_transform(score, intensity):
-            # 0.5를 중심으로 거리 계산
             distance = score - 0.5
-            # S-커브 적용 (시그모이드 기반)
             steepness = intensity * 5.0
             transformed = 0.5 + distance * (2.0 / (1.0 + np.exp(-steepness * distance)))
-            # 범위 제한
             return np.clip(transformed, 0.0, 1.0)
 
-        # 조정된 점수 계산
         adjusted_scores = []
         for _, row in df.iterrows():
             user_id = row['TRAVELER_ID']
             global_score = row['TARGET_SCORE_GLOBAL']
             intensity = persona_intensities.get(user_id, 1.0)
 
-            # S-커브 변환 적용
             adjusted = s_curve_transform(global_score, intensity)
             adjusted_scores.append(adjusted)
 
@@ -120,16 +102,7 @@ class TargetScoreNormalizer:
                                 persona_df_pca: Optional[pd.DataFrame] = None) -> pd.DataFrame:
         """
         타겟 점수 정규화 메인 함수
-
-        Args:
-            df: 정규화할 데이터프레임 (W, WR 컬럼 필요)
-            persona_df_pca: 페르소나별 적응적 정규화를 위한 PCA 데이터프레임
-
-        Returns:
-            정규화된 타겟 점수가 포함된 데이터프레임
         """
-        print("타겟 점수 정규화 중...")
-
         # 1. TARGET_SCORE 계산
         df = self.compute_target_score(df)
 
@@ -140,9 +113,8 @@ class TargetScoreNormalizer:
         df['TARGET_SCORE_YEO'] = yeo_scores
         df['TARGET_SCORE_GLOBAL'] = global_scores
 
-        # 3. 페르소나별 적응적 정규화 (선택적)
+        # 3. 페르소나별 적응적 정규화 
         if self.use_persona_adaptation and persona_df_pca is not None:
-            print("페르소나별 적응적 정규화 수행 중...")
             df = self.persona_adaptive_normalize(df, persona_df_pca)
             df['TARGET_SCORE_FINAL'] = df['TARGET_SCORE_ADJUSTED']
         else:
