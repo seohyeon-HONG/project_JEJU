@@ -15,35 +15,26 @@ class ContrastiveLoss(nn.Module):
         self.temperature = temperature
 
     def normalize_embeddings(self, embeddings: torch.Tensor) -> torch.Tensor:
-        """사전 훈련된 임베딩의 분포를 정규화"""
         normalized = (embeddings - embeddings.mean(dim=0)) / (embeddings.std(dim=0) + 1e-8)
         return normalized
 
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
-        # 입력 임베딩 정규화 적용
         embeddings = self.normalize_embeddings(embeddings)
 
-        # 기존 L2 정규화 유지 (단위 벡터로 변환)
         embeddings = F.normalize(embeddings, p=2, dim=1)
 
-        # 온도 조정된 유사도 행렬 계산
         sim_matrix = torch.matmul(embeddings, embeddings.t()) / self.temperature
 
-        # 대각선 마스킹 (자기 자신과의 유사도 제외)
         mask = torch.eye(sim_matrix.size(0), device=sim_matrix.device)
         mask = 1 - mask
 
-        # 라벨 기반 마스크 생성
         label_matrix = labels.unsqueeze(1) == labels.unsqueeze(0)
         label_matrix = label_matrix.float() * mask
 
-        # negative 마스크
         neg_mask = (~label_matrix.bool()).float() * mask
 
-        # 로그-소프트맥스 계산
         log_prob = F.log_softmax(sim_matrix, dim=1)
 
-        # 내부/외부 대조 손실 계산
         internal_loss = torch.sum(label_matrix * -log_prob, dim=1) / (label_matrix.sum(dim=1) + 1e-8)
         internal_loss = internal_loss.mean()
 
@@ -51,7 +42,6 @@ class ContrastiveLoss(nn.Module):
         hard_negatives = torch.max(neg_sim, dim=1)[0]
         external_loss = torch.mean(F.softplus(hard_negatives))
 
-        # 가중 손실 계산 (config에서 가져올 값들)
         internal_weight = 0.3
         external_weight = 0.7
         loss = internal_weight * internal_loss + external_weight * external_loss
@@ -76,11 +66,10 @@ class RecommendationLoss(nn.Module):
         self.bpr_weight = bpr_weight
         self.reg_weight = reg_weight
         self.filter_reg_weight = filter_reg_weight
-        self.mse = nn.MSELoss(reduction='none')  # 요소별 손실 계산
+        self.mse = nn.MSELoss(reduction='none')  
 
     @staticmethod
     def safe_entropy(weights: torch.Tensor, epsilon: float = 1e-6) -> torch.Tensor:
-        """수치적으로 안정적인 엔트로피 계산"""
         normalized_weights = F.softmax(weights, dim=1)
         safe_weights = torch.clamp(normalized_weights, min=epsilon)
         entropy = -torch.sum(safe_weights * torch.log(safe_weights), dim=1).mean()
@@ -124,7 +113,6 @@ class RecommendationLoss(nn.Module):
         torch.Tensor, Dict[str, float]]:
         batch_size = predictions.size(0)
 
-        # NaN 체크 및 처리
         valid_mask = ~torch.isnan(predictions) & ~torch.isnan(targets)
         if not valid_mask.any():
             return (
@@ -256,49 +244,3 @@ class FocalLoss(nn.Module):
             return focal_loss.sum()
         else:
             return focal_loss
-
-
-def main():
-    """손실 함수 테스트"""
-    batch_size = 32
-    embed_dim = 128
-    num_classes = 10
-
-    # 테스트 데이터
-    embeddings = torch.randn(batch_size, embed_dim)
-    labels = torch.randint(0, num_classes, (batch_size,))
-    predictions = torch.randn(batch_size)
-    targets = torch.randn(batch_size)
-    pc_weights = torch.randn(batch_size, 7)
-
-    print("=== 손실 함수 테스트 ===")
-
-    # 1. ContrastiveLoss 테스트
-    contrastive_loss = ContrastiveLoss(temperature=0.5)
-    cont_loss, cont_components = contrastive_loss(embeddings, labels)
-    print(f"ContrastiveLoss: {cont_loss.item():.4f}")
-    print(f"  Internal: {cont_components['internal']:.4f}")
-    print(f"  External: {cont_components['external']:.4f}")
-
-    # 2. RecommendationLoss 테스트
-    rec_loss = RecommendationLoss(
-        mse_weight=0.5, bpr_weight=0.3, reg_weight=0.1, filter_reg_weight=0.1
-    )
-    total_loss, loss_components = rec_loss(predictions, targets, 0.02, pc_weights)
-    print(f"\nRecommendationLoss: {total_loss.item():.4f}")
-    for comp, value in loss_components.items():
-        print(f"  {comp}: {value:.4f}")
-
-    # 3. TripletLoss 테스트
-    triplet_loss = TripletLoss(margin=0.2)
-    anchor = torch.randn(batch_size, embed_dim)
-    positive = torch.randn(batch_size, embed_dim)
-    negative = torch.randn(batch_size, embed_dim)
-    trip_loss = triplet_loss(anchor, positive, negative)
-    print(f"\nTripletLoss: {trip_loss.item():.4f}")
-
-    print("\n손실 함수 테스트 완료!")
-
-
-if __name__ == "__main__":
-    main()
